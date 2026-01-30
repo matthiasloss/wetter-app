@@ -8,6 +8,18 @@ export default function WeatherDetails({ data }) {
     });
   };
 
+  // Calculate daylight hours
+  const daylightSeconds = data.sys.sunset - data.sys.sunrise;
+  const daylightHours = Math.floor(daylightSeconds / 3600);
+  const daylightMinutes = Math.floor((daylightSeconds % 3600) / 60);
+
+  // Wind direction
+  const getWindDirection = (deg) => {
+    const directions = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+    const index = Math.round(deg / 45) % 8;
+    return directions[index];
+  };
+
   const details = [
     {
       icon: '🌅',
@@ -20,9 +32,19 @@ export default function WeatherDetails({ data }) {
       value: formatTime(data.sys.sunset)
     },
     {
+      icon: '☀️',
+      label: 'Tageslänge',
+      value: `${daylightHours}h ${daylightMinutes}min`
+    },
+    {
       icon: '💨',
       label: 'Wind',
-      value: `${Math.round(data.wind.speed * 3.6)} km/h`
+      value: `${Math.round(data.wind.speed * 3.6)} km/h ${getWindDirection(data.wind.deg || 0)}`
+    },
+    {
+      icon: '🌬️',
+      label: 'Böen',
+      value: data.wind.gust ? `${Math.round(data.wind.gust * 3.6)} km/h` : '–'
     },
     {
       icon: '💧',
@@ -37,7 +59,7 @@ export default function WeatherDetails({ data }) {
     {
       icon: '👁️',
       label: 'Sichtweite',
-      value: `${(data.visibility / 1000).toFixed(1)} km`
+      value: data.visibility >= 10000 ? '> 10 km' : `${(data.visibility / 1000).toFixed(1)} km`
     },
     {
       icon: '🌡️',
@@ -48,29 +70,41 @@ export default function WeatherDetails({ data }) {
       icon: '☁️',
       label: 'Bewölkung',
       value: `${data.clouds.all}%`
+    },
+    {
+      icon: '🌊',
+      label: 'Meereshöhe',
+      value: data.main.sea_level ? `${data.main.sea_level} hPa` : '–'
+    },
+    {
+      icon: '⛰️',
+      label: 'Bodendruck',
+      value: data.main.grnd_level ? `${data.main.grnd_level} hPa` : '–'
     }
   ];
 
   return (
-    <div className="mb-6">
-      <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-        Wetter-Details
+    <div className="mb-4 animate-fade-in">
+      <h3 className="text-lg font-semibold text-white/90 mb-3 px-1">
+        Details
       </h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         {details.map((detail, index) => (
           <div
             key={index}
-            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md"
+            className="glass rounded-2xl p-3"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xl">{detail.icon}</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {detail.label}
-              </span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{detail.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/50 truncate">
+                  {detail.label}
+                </p>
+                <p className="text-sm font-semibold text-white truncate">
+                  {detail.value}
+                </p>
+              </div>
             </div>
-            <p className="text-lg font-semibold text-gray-800 dark:text-white">
-              {detail.value}
-            </p>
           </div>
         ))}
       </div>

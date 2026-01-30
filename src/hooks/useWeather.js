@@ -15,6 +15,7 @@ export function useWeather() {
     setError(null);
 
     try {
+      // Fetch current weather
       const currentRes = await fetch(
         `${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=de`
       );
@@ -24,17 +25,32 @@ export function useWeather() {
       const currentData = await currentRes.json();
       setCurrentWeather(currentData);
 
+      // Fetch forecast (5 days, 3-hour intervals = 40 entries)
       const forecastRes = await fetch(
         `${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=de`
       );
 
       if (forecastRes.ok) {
         const forecastData = await forecastRes.json();
+
+        // Hourly: next 24 hours (8 x 3h = 24h)
         const hourly = forecastData.list.slice(0, 8);
         setHourlyForecast(hourly);
-        const dailyForecast = forecastData.list.filter(item =>
-          item.dt_txt.includes('12:00:00')
-        ).slice(0, 5);
+
+        // Daily: get one entry per day at 12:00 (or closest)
+        const dailyMap = new Map();
+        forecastData.list.forEach(item => {
+          const date = item.dt_txt.split(' ')[0];
+          const hour = parseInt(item.dt_txt.split(' ')[1].split(':')[0]);
+
+          // Prefer 12:00 entries, but store any if none exists
+          if (!dailyMap.has(date) || hour === 12) {
+            dailyMap.set(date, item);
+          }
+        });
+
+        // Convert to array and take up to 7 days
+        const dailyForecast = Array.from(dailyMap.values()).slice(0, 7);
         setForecast(dailyForecast);
       }
     } catch (err) {
@@ -65,17 +81,28 @@ export function useWeather() {
       const currentData = await currentRes.json();
       setCurrentWeather(currentData);
 
+      // Fetch forecast
       const forecastRes = await fetch(
         `${BASE_URL}/forecast?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric&lang=de`
       );
 
       if (forecastRes.ok) {
         const forecastData = await forecastRes.json();
+
         const hourly = forecastData.list.slice(0, 8);
         setHourlyForecast(hourly);
-        const dailyForecast = forecastData.list.filter(item =>
-          item.dt_txt.includes('12:00:00')
-        ).slice(0, 5);
+
+        const dailyMap = new Map();
+        forecastData.list.forEach(item => {
+          const date = item.dt_txt.split(' ')[0];
+          const hour = parseInt(item.dt_txt.split(' ')[1].split(':')[0]);
+
+          if (!dailyMap.has(date) || hour === 12) {
+            dailyMap.set(date, item);
+          }
+        });
+
+        const dailyForecast = Array.from(dailyMap.values()).slice(0, 7);
         setForecast(dailyForecast);
       }
     } catch (err) {
@@ -92,7 +119,6 @@ export function useWeather() {
     setLoading(true);
     setError(null);
 
-    // First try browser geolocation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -130,9 +156,9 @@ export function useWeather() {
           }
         },
         {
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 300000
+          enableHighAccuracy: true,  // GPS statt IP
+          timeout: 10000,
+          maximumAge: 60000  // Cache für 1 Minute
         }
       );
     } else {
