@@ -9,26 +9,23 @@ import Favorites from './components/Favorites';
 import WeatherMap from './components/WeatherMap';
 import WeatherAnimation from './components/WeatherAnimation';
 import WeatherDescription from './components/WeatherDescription';
-import DarkModeToggle from './components/DarkModeToggle';
 
 function App() {
   const { loading, error, currentWeather, forecast, hourlyForecast, fetchWeather, fetchByGeolocation } = useWeather();
-
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
 
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('weatherFavorites');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Load saved location on startup
+  // Load saved location or auto-detect on startup
   useEffect(() => {
     const savedCity = localStorage.getItem('weatherLastCity');
     if (savedCity) {
       fetchWeather(savedCity);
+    } else {
+      // Auto-detect location on first visit
+      fetchByGeolocation();
     }
   }, []);
 
@@ -42,15 +39,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem('weatherFavorites', JSON.stringify(favorites));
   }, [favorites]);
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
 
   const handleSearch = (city) => {
     fetchWeather(city);
@@ -76,8 +64,29 @@ function App() {
     ? Date.now() / 1000 > currentWeather.sys.sunrise && Date.now() / 1000 < currentWeather.sys.sunset
     : true;
 
+  // Dynamic background based on weather
+  const getBackgroundClass = () => {
+    if (!currentWeather) return 'from-sky-400 via-blue-500 to-blue-700';
+
+    const weatherId = currentWeather.weather[0].id;
+
+    if (weatherId >= 200 && weatherId < 300) {
+      return 'from-slate-800 via-purple-900 to-slate-900'; // Thunder
+    } else if (weatherId >= 300 && weatherId < 600) {
+      return 'from-slate-600 via-blue-700 to-slate-800'; // Rain
+    } else if (weatherId >= 600 && weatherId < 700) {
+      return 'from-slate-300 via-blue-300 to-slate-400'; // Snow
+    } else if (weatherId >= 700 && weatherId < 800) {
+      return 'from-amber-300 via-gray-500 to-slate-600'; // Atmosphere
+    } else if (weatherId >= 801) {
+      return isDay ? 'from-gray-500 via-slate-600 to-gray-700' : 'from-slate-800 via-slate-900 to-black'; // Clouds
+    }
+
+    return isDay ? 'from-sky-400 via-blue-500 to-blue-700' : 'from-indigo-900 via-purple-900 to-slate-900';
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 transition-colors relative overflow-hidden">
+    <div className={`min-h-screen bg-gradient-to-b ${getBackgroundClass()} transition-all duration-1000 relative overflow-hidden`}>
       {/* Weather Animation Background */}
       {currentWeather && (
         <WeatherAnimation
@@ -86,12 +95,12 @@ function App() {
         />
       )}
 
-      <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(!darkMode)} />
-
-      <div className="max-w-2xl mx-auto px-4 py-8 relative z-10">
-        <h1 className="text-4xl font-bold text-center text-gray-800 dark:text-white mb-8">
-          Wetter App
-        </h1>
+      <div className="max-w-lg mx-auto px-5 py-8 relative z-10 safe-area-top safe-area-bottom">
+        <header className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-white drop-shadow-lg">
+            Wetter
+          </h1>
+        </header>
 
         <SearchBar
           onSearch={handleSearch}
@@ -99,27 +108,32 @@ function App() {
           loading={loading}
         />
 
-        <Favorites
-          favorites={favorites}
-          onSelect={handleSearch}
-          onRemove={removeFavorite}
-        />
+        {favorites.length > 0 && (
+          <Favorites
+            favorites={favorites}
+            onSelect={handleSearch}
+            onRemove={removeFavorite}
+          />
+        )}
 
         {error && (
-          <div className="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-6">
-            {error}
+          <div className="glass-dark text-white/90 px-5 py-4 rounded-2xl mb-6 animate-fade-in">
+            <p className="flex items-center gap-2">
+              <span>⚠️</span>
+              {error}
+            </p>
           </div>
         )}
 
         {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin text-4xl">🌀</div>
-            <p className="text-gray-500 dark:text-gray-400 mt-4">Lade Wetterdaten...</p>
+          <div className="text-center py-20">
+            <div className="inline-block text-6xl animate-pulse-slow">☁️</div>
+            <p className="text-white/70 mt-6 font-medium">Lade Wetterdaten...</p>
           </div>
         )}
 
         {!loading && currentWeather && (
-          <>
+          <div className="space-y-4">
             <CurrentWeather
               data={currentWeather}
               onAddFavorite={toggleFavorite}
@@ -141,20 +155,19 @@ function App() {
               temp={currentWeather.main.temp}
               description={currentWeather.weather[0].description}
             />
-          </>
-        )}
-
-        {!currentWeather && !loading && !error && (
-          <div className="text-center text-gray-500 dark:text-gray-400 py-12">
-            <p className="text-6xl mb-4">🌤️</p>
-            <p>Gib eine Stadt ein oder nutze deinen Standort</p>
-            <p className="text-sm mt-2">Klicke auf 📍 für automatische Standorterkennung</p>
           </div>
         )}
 
-        <footer className="text-center text-gray-400 dark:text-gray-500 text-sm mt-8">
+        {!currentWeather && !loading && !error && (
+          <div className="text-center py-20 animate-fade-in">
+            <p className="text-8xl mb-6 animate-float">🌤️</p>
+            <p className="text-white/80 text-lg font-medium">Lade Wetterdaten...</p>
+            <p className="text-white/50 text-sm mt-2">Standort wird ermittelt</p>
+          </div>
+        )}
+
+        <footer className="text-center text-white/40 text-xs mt-10 pb-4">
           <p>Daten von OpenWeatherMap</p>
-          <p className="mt-1 text-xs">Installiere die App: Browser-Menü → "Zum Startbildschirm"</p>
         </footer>
       </div>
     </div>
